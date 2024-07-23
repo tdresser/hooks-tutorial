@@ -94,8 +94,8 @@ let divId = 0;
 // let refs = [];
 function r<Props>(generator: (props: Props) => string, props: Props) {
   let div = document.createElement("div");
+  div.id = "div" + (++divId);
   div.innerHTML = generator(props);
-  div.id = "div" + divId++;
   return div.outerHTML;
 }
 
