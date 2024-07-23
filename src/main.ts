@@ -2,24 +2,48 @@ import './style.css'
 
 // https://github.com/preactjs/preact/blob/f5738915a0d67c87f54f0ccd5b946e7a4ce0d5c1/hooks/src/index.js#L281
 
-let hookStates: any[] = [];
+interface UninitializedHookState { }
+
+type HookState = ValueHookState<any> | UseStateHookState<any> | UninitializedHookState;
+let hookStates: HookState[] = [];
 
 let currentIndex = 0;
 
-function getHookState(index: number) {
+interface ValueHookState<T> {
+  value: T;
+}
+
+interface UseStateHookState<T> {
+  value: T;
+  setter: ((t: T) => void);
+}
+
+
+function getHookState<T extends HookState>(index: number): T {
   if (hookStates.length <= index) {
     hookStates.push({});
   }
-  return hookStates[index];
+  // This is a bit ugly, but is a convenient way to instantiate empty states.
+  return hookStates[index] as T;
 }
 
-function useMemo<T>(factory: () => T) {
-  let state = getHookState(currentIndex++)
-  console.log(state);
-  if (!state["value"]) {
+function useMemo<T>(factory: () => T): T {
+  let state = getHookState<ValueHookState<T>>(currentIndex++)
+  if (!state.value) {
     state.value = factory();
   }
   return state.value;
+}
+
+function useState<T>(initialValue: T): [T, (t: T) => void] {
+  let state = getHookState<UseStateHookState<T>>(currentIndex++)
+  if (!state.value) {
+    state.value = initialValue;
+    state.setter = (t: T) => {
+      state.value = t;
+    }
+  }
+  return [state.value, state.setter];
 }
 
 class PendingEffect {
@@ -67,6 +91,8 @@ function Multiplier(props: MultiplierProps) {
 }
 
 function Counter() {
+  let [counter, setCounter] = useState(0);
+
   let incrementEl = useRef((root: HTMLElement) => {
     console.log(root);
     return root.querySelector(".increment");
@@ -75,15 +101,14 @@ function Counter() {
   useEffect(() => {
     console.log("current: " + incrementEl.current);
     incrementEl.current?.addEventListener("click", () => {
-      console.log("Added event listener")
-      console.log("clicked");
+      setCounter(counter + 1);
     });
   })
 
   return `
     <div class="increment">Increment</div>
-    ${r(Multiplier, { x: 3, y: 2 })}
-    ${r(Multiplier, { x: 4, y: 2 })}
+    ${r(Multiplier, { x: counter, y: 2 })}
+    ${r(Multiplier, { x: counter, y: 3 })}
 `;
 }
 
