@@ -4,13 +4,14 @@ import './style.css'
 
 interface UninitializedHookState { }
 
-type HookState = ValueHookState<any> | UseStateHookState<any> | UninitializedHookState;
+type HookState = UseMemoHookState<any> | UseStateHookState<any> | UninitializedHookState;
 let hookStates: HookState[] = [];
 
 let currentIndex = 0;
 
-interface ValueHookState<T> {
+interface UseMemoHookState<T> {
   value: T;
+  lastArgs: any[];
 }
 
 interface UseStateHookState<T> {
@@ -19,7 +20,9 @@ interface UseStateHookState<T> {
 }
 
 
-function getHookState<T extends HookState>(index: number): T {
+function getHookState<T extends HookState>(): T {
+  let index = currentIndex;
+  currentIndex++;
   if (hookStates.length <= index) {
     hookStates.push({});
   }
@@ -27,17 +30,44 @@ function getHookState<T extends HookState>(index: number): T {
   return hookStates[index] as T;
 }
 
-function useMemo<T>(factory: () => T): T {
-  let state = getHookState<ValueHookState<T>>(currentIndex++)
-  if (!state.value) {
+function argsEqual(a: any[] | undefined, b: any[] | undefined): boolean {
+  if (a == undefined && b == undefined) {
+    return true;
+  }
+  if (a == undefined || b == undefined) {
+    return false;
+  }
+  if (a.length != b.length) {
+    return false;
+  }
+  for (let i = 0; i < a.length; ++i) {
+    if (a[i] != b[i]) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function useMemo<T>(factory: () => T, args: any[]): T {
+  let state = getHookState<UseMemoHookState<T>>()
+  console.log("args / args")
+  console.log(args);
+  console.log(state.lastArgs);
+
+  console.log("recomputing? " + !argsEqual(args, state.lastArgs));
+
+  if (state.value == undefined || !argsEqual(args, state.lastArgs)) {
     state.value = factory();
+    state.lastArgs = args;
+  } else {
+    console.log("using cache")
   }
   return state.value;
 }
 
 function useState<T>(initialValue: T): [T, (t: T) => void] {
-  let state = getHookState<UseStateHookState<T>>(currentIndex++)
-  if (!state.value) {
+  let state = getHookState<UseStateHookState<T>>()
+  if (state.value == undefined) {
     state.value = initialValue;
     state.setter = (t: T) => {
       state.value = t;
@@ -79,9 +109,9 @@ interface MultiplierProps {
 
 function Multiplier(props: MultiplierProps) {
   let value = useMemo(() => {
-    console.log("Computing value");
+    console.log("Computing value: " + props.y);
     return props.x * props.y;
-  });
+  }, [props.x, props.y]);
 
   //let value = x * y;
 
@@ -94,12 +124,10 @@ function Counter() {
   let [counter, setCounter] = useState(0);
 
   let incrementEl = useRef((root: HTMLElement) => {
-    console.log(root);
     return root.querySelector(".increment");
   })
 
   useEffect(() => {
-    console.log("current: " + incrementEl.current);
     incrementEl.current?.addEventListener("click", () => {
       setCounter(counter + 1);
     });
@@ -112,11 +140,7 @@ function Counter() {
 `;
 }
 
-// Writing a function which takes some params and returns a string.
-// I just want to postprocess it's output each time it's called.
-
 let divId = 0;
-// let refs = [];
 function r<Props>(generator: (props: Props) => string, props: Props) {
   let div = document.createElement("div");
   div.id = "div" + (++divId);
@@ -150,6 +174,7 @@ function renderRoot<Props>(generator: () => string, props: Props, container: Ele
 
 renderRoot(App, {}, document.querySelector('#app') ?? fail())
 
+// TODO: get rid of this.
 document.body.addEventListener("click", () => {
   renderRoot(App, {}, document.querySelector('#app') ?? fail())
 })
