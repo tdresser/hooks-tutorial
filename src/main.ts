@@ -30,37 +30,21 @@ function getHookState<T extends HookState>(): T {
   return hookStates[index] as T;
 }
 
+// Inspired by https://github.com/preactjs/preact/blob/f5738915a0d67c87f54f0ccd5b946e7a4ce0d5c1/hooks/src/index.js#L535
 function argsEqual(a: any[] | undefined, b: any[] | undefined): boolean {
-  if (a == undefined && b == undefined) {
-    return true;
-  }
-  if (a == undefined || b == undefined) {
-    return false;
-  }
-  if (a.length != b.length) {
-    return false;
-  }
-  for (let i = 0; i < a.length; ++i) {
-    if (a[i] != b[i]) {
-      return false;
-    }
-  }
-  return true;
+  return !(!a || !b ||
+    (a.length !== b.length) ||
+    a.some((arg, index) => arg !== b[index]));
 }
 
 function useMemo<T>(factory: () => T, args: any[]): T {
   let state = getHookState<UseMemoHookState<T>>()
-  console.log("args / args")
-  console.log(args);
-  console.log(state.lastArgs);
 
-  console.log("recomputing? " + !argsEqual(args, state.lastArgs));
-
-  if (state.value == undefined || !argsEqual(args, state.lastArgs)) {
+  if (!argsEqual(args, state.lastArgs)) {
     state.value = factory();
     state.lastArgs = args;
   } else {
-    console.log("using cache")
+    console.log("Cached");
   }
   return state.value;
 }
@@ -75,6 +59,7 @@ function useState<T>(initialValue: T): [T, ((f: (x: T) => T) => void)] {
       pendingStateUpdates.push(() => {
         state.value = f(state.value);
       })
+      requestRerender();
     }
   }
   return [state.value, state.setter];
@@ -120,7 +105,7 @@ function Multiplier(props: MultiplierProps) {
   //let value = x * y;
 
   return `
-  <p>Component 1: ${props.x} x ${props.y} = ${value}</p>
+  <p>${props.x} x ${props.y} = ${value}</p>
   `
 }
 
@@ -133,7 +118,11 @@ function Counter() {
 
   useEffect(() => {
     incrementEl.current?.addEventListener("click", () => {
-      setCounter((counter) => counter + 1);
+      console.log("CLICK");
+      setCounter((counter) => {
+        console.log("Setting counter to " + (counter + 1))
+        return counter + 1
+      });
     });
   })
 
@@ -165,11 +154,33 @@ function fail(msg?: string): never {
   throw (msg ?? "Failure");
 }
 
-function renderRoot<Props>(generator: () => string, props: Props, container: Element) {
+interface RootRenderingParams {
+  generator: () => string;
+  container: Element;
+}
+
+let rootRenderingParams: RootRenderingParams | null = null;
+let pendingRerender: boolean = false;
+
+function requestRerender() {
+  if (pendingRerender) {
+    return;
+  }
+  pendingRerender = true;
+  window.setTimeout(rerenderRoot, 0);
+}
+
+function rerenderRoot() {
+  if (!rootRenderingParams) {
+    throw ("Missing rootRenderingParams");
+  }
+  console.log("Render");
+  pendingRerender = false;
   currentIndex = 0;
   divId = 0;
   pendingEffects.length = 0;
-  container.innerHTML = r(generator, props);
+
+  rootRenderingParams.container.innerHTML = r(rootRenderingParams.generator, {});
 
   for (const effect of pendingEffects) {
     effect.effect(document.getElementById("div" + effect.divId) ?? fail("Missing root"));
@@ -178,14 +189,20 @@ function renderRoot<Props>(generator: () => string, props: Props, container: Ele
   for (const stateUpdate of pendingStateUpdates) {
     stateUpdate();
   }
+
   if (pendingStateUpdates.length > 0) {
-    //window.setTimeout()
+    requestRerender();
   }
+  pendingStateUpdates = [];
 }
 
-renderRoot(App, {}, document.querySelector('#app') ?? fail())
+// Root render doesn't get any props.
+function render(generator: () => string, container: Element) {
+  rootRenderingParams = {
+    generator,
+    container
+  };
+  rerenderRoot();
+}
 
-// TODO: get rid of this.
-document.body.addEventListener("click", () => {
-  renderRoot(App, {}, document.querySelector('#app') ?? fail())
-})
+render(App, document.querySelector('#app') ?? fail())
