@@ -16,7 +16,7 @@ interface UseMemoHookState<T> {
 
 interface UseStateHookState<T> {
   value: T;
-  setter: ((t: T) => void);
+  setter: ((f: (x: T) => T) => void);
 }
 
 
@@ -65,12 +65,16 @@ function useMemo<T>(factory: () => T, args: any[]): T {
   return state.value;
 }
 
-function useState<T>(initialValue: T): [T, (t: T) => void] {
+let pendingStateUpdates: (() => void)[] = [];
+
+function useState<T>(initialValue: T): [T, ((f: (x: T) => T) => void)] {
   let state = getHookState<UseStateHookState<T>>()
   if (state.value == undefined) {
     state.value = initialValue;
-    state.setter = (t: T) => {
-      state.value = t;
+    state.setter = (f: (x: T) => T) => {
+      pendingStateUpdates.push(() => {
+        state.value = f(state.value);
+      })
     }
   }
   return [state.value, state.setter];
@@ -129,7 +133,7 @@ function Counter() {
 
   useEffect(() => {
     incrementEl.current?.addEventListener("click", () => {
-      setCounter(counter + 1);
+      setCounter((counter) => counter + 1);
     });
   })
 
@@ -169,6 +173,13 @@ function renderRoot<Props>(generator: () => string, props: Props, container: Ele
 
   for (const effect of pendingEffects) {
     effect.effect(document.getElementById("div" + effect.divId) ?? fail("Missing root"));
+  }
+
+  for (const stateUpdate of pendingStateUpdates) {
+    stateUpdate();
+  }
+  if (pendingStateUpdates.length > 0) {
+    //window.setTimeout()
   }
 }
 
