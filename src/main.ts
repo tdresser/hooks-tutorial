@@ -1,33 +1,28 @@
 import './style.css'
 
-// https://github.com/preactjs/preact/blob/f5738915a0d67c87f54f0ccd5b946e7a4ce0d5c1/hooks/src/index.js#L281
+class HookStates<T> {
+  index: number = 0;
+  states: T[] = [];
 
-interface UninitializedHookState { }
-
-type HookState = UseMemoHookState<any> | UseStateHookState<any> | UninitializedHookState;
-let hookStates: HookState[] = [];
-
-let currentIndex = 0;
-
-interface UseMemoHookState<T> {
-  value: T;
-  lastArgs: any[];
-}
-
-interface UseStateHookState<T> {
-  value: T;
-  setter: ((f: (x: T) => T) => void);
-}
-
-
-function getHookState<T extends HookState>(): T {
-  let index = currentIndex;
-  currentIndex++;
-  if (hookStates.length <= index) {
-    hookStates.push({});
+  reset() {
+    this.index = 0;
   }
-  // This is a bit ugly, but is a convenient way to instantiate empty states.
-  return hookStates[index] as T;
+}
+
+function getHookState<T>(hookStates: HookStates<T>, factory: () => T): T {
+  let index = hookStates.index;
+  hookStates.index++;
+  if (hookStates.states.length <= index) {
+    hookStates.states.push(factory());
+  }
+  return hookStates.states[index] as T;
+}
+
+let useStateHookStates = new HookStates<UseStateHookState<any>>();
+
+class UseStateHookState<T> {
+  value: T | null = null;
+  setter: ((f: (x: T) => T) => void) | null = null;
 }
 
 // Inspired by https://github.com/preactjs/preact/blob/f5738915a0d67c87f54f0ccd5b946e7a4ce0d5c1/hooks/src/index.js#L535
@@ -37,32 +32,40 @@ function argsEqual(a: any[] | undefined, b: any[] | undefined): boolean {
     a.some((arg, index) => arg !== b[index]));
 }
 
+class UseMemoHookState<T> {
+  value: T | null = null;
+  lastArgs: any[] = [];
+}
+
+let useMemoHookStates = new HookStates<UseMemoHookState<any>>();
+
 function useMemo<T>(factory: () => T, args: any[]): T {
-  let state = getHookState<UseMemoHookState<T>>()
+  let state = getHookState<UseMemoHookState<T>>(useMemoHookStates, () => new UseMemoHookState());
 
   if (!argsEqual(args, state.lastArgs)) {
     state.value = factory();
     state.lastArgs = args;
-  } else {
-    console.log("Cached");
   }
-  return state.value;
+
+  return state.value ?? fail("Missing state value");
 }
 
 let pendingStateUpdates: (() => void)[] = [];
 
 function useState<T>(initialValue: T): [T, ((f: (x: T) => T) => void)] {
-  let state = getHookState<UseStateHookState<T>>()
+
+  let state = getHookState<UseStateHookState<T>>(useStateHookStates, () => new UseStateHookState())
   if (state.value == undefined) {
     state.value = initialValue;
     state.setter = (f: (x: T) => T) => {
       pendingStateUpdates.push(() => {
-        state.value = f(state.value);
+        // TODO: this cast is gross, but I'm not sure how to avoid it.
+        state.value = f(state.value as T);
       })
       requestRerender();
     }
   }
-  return [state.value, state.setter];
+  return [state.value, state.setter ?? fail("missing setter")];
 }
 
 class PendingEffect {
@@ -101,8 +104,6 @@ function Multiplier(props: MultiplierProps) {
     console.log("Computing value: " + props.y);
     return props.x * props.y;
   }, [props.x, props.y]);
-
-  //let value = x * y;
 
   return `
   <p>${props.x} x ${props.y} = ${value}</p>
@@ -176,24 +177,22 @@ function rerenderRoot() {
   }
   console.log("Render");
   pendingRerender = false;
-  currentIndex = 0;
+  useStateHookStates.reset();
+  useMemoHookStates.reset();
   divId = 0;
-  pendingEffects.length = 0;
+  pendingEffects = [];
+
+  for (const stateUpdate of pendingStateUpdates) {
+    stateUpdate();
+  }
+
+  pendingStateUpdates = [];
 
   rootRenderingParams.container.innerHTML = r(rootRenderingParams.generator, {});
 
   for (const effect of pendingEffects) {
     effect.effect(document.getElementById("div" + effect.divId) ?? fail("Missing root"));
   }
-
-  for (const stateUpdate of pendingStateUpdates) {
-    stateUpdate();
-  }
-
-  if (pendingStateUpdates.length > 0) {
-    requestRerender();
-  }
-  pendingStateUpdates = [];
 }
 
 // Root render doesn't get any props.
