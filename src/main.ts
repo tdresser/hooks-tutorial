@@ -21,8 +21,13 @@ function getHookState<T>(hookStates: HookStates<T>, factory: () => T): T {
 let useStateHookStates = new HookStates<UseStateHookState<any>>();
 
 class UseStateHookState<T> {
-  value: T | null = null;
-  setter: ((f: (x: T) => T) => void) | null = null;
+  value: T;
+  setter: ((f: (x: T) => T) => void);
+
+  constructor(value: T, setter: (f: (x: T) => T) => void) {
+    this.value = value;
+    this.setter = setter;
+  }
 }
 
 // Inspired by https://github.com/preactjs/preact/blob/f5738915a0d67c87f54f0ccd5b946e7a4ce0d5c1/hooks/src/index.js#L535
@@ -53,18 +58,12 @@ function useMemo<T>(factory: () => T, args: any[]): T {
 let pendingStateUpdates: (() => void)[] = [];
 
 function useState<T>(initialValue: T): [T, ((f: (x: T) => T) => void)] {
-
-  let state = getHookState<UseStateHookState<T>>(useStateHookStates, () => new UseStateHookState())
-  if (state.value == undefined) {
-    state.value = initialValue;
-    state.setter = (f: (x: T) => T) => {
-      pendingStateUpdates.push(() => {
-        // TODO: this cast is gross, but I'm not sure how to avoid it.
-        state.value = f(state.value as T);
-      })
-      requestRerender();
-    }
-  }
+  let state = getHookState<UseStateHookState<T>>(useStateHookStates, () => new UseStateHookState(initialValue, (f: (x: T) => T) => {
+    pendingStateUpdates.push(() => {
+      state.value = f(state.value);
+    })
+    requestRerender();
+  }))
   return [state.value, state.setter ?? fail("missing setter")];
 }
 
