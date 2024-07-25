@@ -18,6 +18,7 @@ function getHookState<T>(hookStates: HookStates<T>, factory: () => T): T {
   return hookStates.states[index] as T;
 }
 
+// Every time we tick we want to be in a consistent state, so we resolve all of these at once.
 let useStateHookStates = new HookStates<UseStateHookState<any>>();
 
 class UseStateHookState<T> {
@@ -141,8 +142,9 @@ function r<Props>(generator: (props: Props) => string, props: Props) {
   return div.outerHTML;
 }
 
-function App() {
+function App(props: { title: string }) {
   return `
+  <h1>${props.title}</h1>
   <div>
       ${r(Counter, {})}
       ${r(Counter, {})}
@@ -154,12 +156,13 @@ function fail(msg?: string): never {
   throw (msg ?? "Failure");
 }
 
-interface RootRenderingParams {
-  generator: () => string;
+interface RootRenderingParams<T> {
+  generator: (props: T) => string;
   container: Element;
+  props: T;
 }
 
-let rootRenderingParams: RootRenderingParams | null = null;
+let rootRenderingParams: RootRenderingParams<any> | null = null;
 let pendingRerender: boolean = false;
 
 function requestRerender() {
@@ -187,7 +190,7 @@ function rerenderRoot() {
 
   pendingStateUpdates = [];
 
-  rootRenderingParams.container.innerHTML = r(rootRenderingParams.generator, {});
+  rootRenderingParams.container.innerHTML = r(rootRenderingParams.generator, rootRenderingParams.props);
 
   for (const effect of pendingEffects) {
     effect.effect(document.getElementById("div" + effect.divId) ?? fail("Missing root"));
@@ -195,12 +198,13 @@ function rerenderRoot() {
 }
 
 // Root render doesn't get any props.
-function render(generator: () => string, container: Element) {
+function render<Props>(generator: (props: Props) => string, container: Element, props: Props) {
   rootRenderingParams = {
     generator,
-    container
+    container,
+    props
   };
   rerenderRoot();
 }
 
-render(App, document.querySelector('#app') ?? fail())
+render(App, document.querySelector('#app') ?? fail(), { title: "Title" })
