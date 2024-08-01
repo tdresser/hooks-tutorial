@@ -198,7 +198,7 @@ function rerenderRoot() {
 }
 
 // Root render doesn't get any props.
-function render<Props>(generator: (props: Props) => string, container: Element, props: Props) {
+function render<Props>(generator: (props: Props) => string, props: Props, container: Element) {
   rootRenderingParams = {
     generator,
     container,
@@ -207,4 +207,4 @@ function render<Props>(generator: (props: Props) => string, container: Element, 
   rerenderRoot();
 }
 
-render(App, document.querySelector('#app') ?? fail(), { title: "Title" })
+render(App, { title: "Title" }, document.querySelector('#app') ?? fail())
