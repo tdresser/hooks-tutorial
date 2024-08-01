@@ -18,19 +18,6 @@ function getHookState<T>(hookStates: HookStates<T>, factory: () => T): T {
   return hookStates.states[index] as T;
 }
 
-// Every time we tick we want to be in a consistent state, so we resolve all of these at once.
-let useStateHookStates = new HookStates<UseStateHookState<any>>();
-
-class UseStateHookState<T> {
-  value: T;
-  setter: ((f: (x: T) => T) => void);
-
-  constructor(value: T, setter: (f: (x: T) => T) => void) {
-    this.value = value;
-    this.setter = setter;
-  }
-}
-
 // Inspired by https://github.com/preactjs/preact/blob/f5738915a0d67c87f54f0ccd5b946e7a4ce0d5c1/hooks/src/index.js#L535
 function argsEqual(a: any[] | undefined, b: any[] | undefined): boolean {
   return !(!a || !b ||
@@ -40,7 +27,7 @@ function argsEqual(a: any[] | undefined, b: any[] | undefined): boolean {
 
 class UseMemoHookState<T> {
   value: T | null = null;
-  lastArgs: any[] = [];
+  lastArgs: any[] | undefined = undefined;
 }
 
 let useMemoHookStates = new HookStates<UseMemoHookState<any>>();
@@ -59,12 +46,18 @@ function useMemo<T>(factory: () => T, args: any[]): T {
 let pendingStateUpdates: (() => void)[] = [];
 
 function useState<T>(initialValue: T): [T, ((f: (x: T) => T) => void)] {
-  let state = getHookState<UseStateHookState<T>>(useStateHookStates, () => new UseStateHookState(initialValue, (f: (x: T) => T) => {
-    pendingStateUpdates.push(() => {
-      state.value = f(state.value);
-    })
-    requestRerender();
-  }))
+  let state = useMemo(() => {
+    return {
+      value: initialValue,
+      setter: (f: (x: T) => T) => {
+        pendingStateUpdates.push(() => {
+          state.value = f(state.value);
+        })
+        requestRerender();
+      }
+    }
+  }, [])
+
   return [state.value, state.setter ?? fail("missing setter")];
 }
 
@@ -179,7 +172,6 @@ function rerenderRoot() {
   }
   console.log("Render");
   pendingRerender = false;
-  useStateHookStates.reset();
   useMemoHookStates.reset();
   divId = 0;
   pendingEffects = [];
