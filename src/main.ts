@@ -1,8 +1,6 @@
 import { fail, r, render, useEffect, useMemo, useRef, useState } from './lib';
 import './style.css'
 
-
-
 interface MultiplierProps {
   x: number,
   y: number
@@ -10,7 +8,6 @@ interface MultiplierProps {
 
 function Multiplier(props: MultiplierProps) {
   let value = useMemo(() => {
-    console.log("Computing value: " + props.y);
     return props.x * props.y;
   }, [props.x, props.y]);
 
@@ -28,7 +25,6 @@ function Counter() {
 
   useEffect(() => {
     incrementEl.current?.addEventListener("click", () => {
-      console.log("CLICK");
       setCounter((counter) => {
         console.log("Setting counter to " + (counter + 1))
         return counter + 1

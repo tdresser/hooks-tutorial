@@ -1,0 +1,85 @@
+// But now it doesn't respond to changing props.
+
+import './style.css'
+
+function fail(msg?: string): never {
+  throw (msg ?? "Failure");
+}
+
+let rerenderRoot: (() => void) | null = null;
+let pendingRerender: boolean = false;
+
+function requestRerender() {
+  if (pendingRerender) {
+    return;
+  }
+  pendingRerender = true;
+  window.requestAnimationFrame(performTopLevelRerender);
+}
+
+let useMemoHookIndex = 0;
+function performTopLevelRerender() {
+  pendingRerender = false;
+  useMemoHookIndex = 0;
+  rerenderRoot?.();
+}
+
+function render<Props>(generator: (props: Props) => string, props: Props, container: Element) {
+  rerenderRoot = () => {
+    container.innerHTML = generator(props);
+  }
+  performTopLevelRerender();
+}
+
+
+class UseMemoHookState<T> {
+  value: T | null = null;
+}
+
+let useMemoHookStates: UseMemoHookState<any>[] = [];
+
+export function useMemo<T>(factory: () => T): T {
+  let index = useMemoHookIndex++;
+  if (useMemoHookStates.length <= index) {
+    useMemoHookStates.push({ value: factory() });
+  }
+  const state = useMemoHookStates[index];
+  return state.value;
+}
+
+interface MultiplierProps {
+  x: number,
+  y: number
+}
+
+function Multiplier(props: MultiplierProps) {
+  let value = useMemo(() => {
+    console.log("Recomputing value");
+    return props.x * props.y;
+  });
+  return `
+    <p>${props.x} x ${props.y} = ${value}</p>
+    `
+}
+
+let xValue = 5;
+function App(props: { title: string }) {
+  return `
+  <div>
+      <h1>${props.title}</h1>
+      ${Multiplier({ x: xValue, y: 2 })}
+      ${Multiplier({ x: xValue, y: 3 })}
+  </div>
+  `
+}
+
+const appProps = {
+  title: "Title"
+}
+render(App, appProps, document.querySelector('#app') ?? fail())
+
+document.addEventListener("click", () => {
+  appProps.title = "Title " + Math.random();
+  xValue += 1;
+  requestRerender();
+})
