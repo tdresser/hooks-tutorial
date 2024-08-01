@@ -29,6 +29,8 @@ function useMemo<T>(factory: () => T, args: any[]): T {
   return state.value;
 }
 
+// Every render runs on a single state which is unmodified for the duration of the render.
+// We cache all pending state updates here.
 let pendingStateUpdates: (() => void)[] = [];
 
 function useState<T>(initialValue: T): [T, ((f: (x: T) => T) => void)] {
@@ -73,6 +75,70 @@ function useRef(f: (root: HTMLElement) => HTMLElement | null) {
   return ref;
 }
 
+let divId = 0;
+function r<Props>(generator: (props: Props) => string, props: Props) {
+  let div = document.createElement("div");
+  div.id = "div" + (++divId);
+  div.innerHTML = generator(props);
+  return div.outerHTML;
+}
+
+
+function fail(msg?: string): never {
+  throw (msg ?? "Failure");
+}
+
+interface RootRenderingParams<T> {
+  generator: (props: T) => string;
+  container: Element;
+  props: T;
+}
+
+let rootRenderingParams: RootRenderingParams<any> | null = null;
+let pendingRerender: boolean = false;
+
+function requestRerender() {
+  if (pendingRerender) {
+    return;
+  }
+  pendingRerender = true;
+  window.requestAnimationFrame(rerenderRoot);
+}
+
+function rerenderRoot() {
+  if (!rootRenderingParams) {
+    throw ("Missing rootRenderingParams");
+  }
+  console.log("Render");
+  pendingRerender = false;
+  useMemoHookIndex = 0;
+  divId = 0;
+  pendingEffects = [];
+
+  for (const stateUpdate of pendingStateUpdates) {
+    stateUpdate();
+  }
+
+  pendingStateUpdates = [];
+
+  rootRenderingParams.container.innerHTML = r(rootRenderingParams.generator, rootRenderingParams.props);
+
+  for (const effect of pendingEffects) {
+    effect.effect(document.getElementById("div" + effect.divId) ?? fail("Missing root"));
+  }
+}
+
+// Root render doesn't get any props.
+function render<Props>(generator: (props: Props) => string, props: Props, container: Element) {
+  rootRenderingParams = {
+    generator,
+    container,
+    props
+  };
+  rerenderRoot();
+}
+
+
 interface MultiplierProps {
   x: number,
   y: number
@@ -113,14 +179,6 @@ function Counter() {
 `;
 }
 
-let divId = 0;
-function r<Props>(generator: (props: Props) => string, props: Props) {
-  let div = document.createElement("div");
-  div.id = "div" + (++divId);
-  div.innerHTML = generator(props);
-  return div.outerHTML;
-}
-
 function App(props: { title: string }) {
   return `
   <h1>${props.title}</h1>
@@ -130,59 +188,4 @@ function App(props: { title: string }) {
   </div>
   `
 }
-
-function fail(msg?: string): never {
-  throw (msg ?? "Failure");
-}
-
-interface RootRenderingParams<T> {
-  generator: (props: T) => string;
-  container: Element;
-  props: T;
-}
-
-let rootRenderingParams: RootRenderingParams<any> | null = null;
-let pendingRerender: boolean = false;
-
-function requestRerender() {
-  if (pendingRerender) {
-    return;
-  }
-  pendingRerender = true;
-  window.setTimeout(rerenderRoot, 0);
-}
-
-function rerenderRoot() {
-  if (!rootRenderingParams) {
-    throw ("Missing rootRenderingParams");
-  }
-  console.log("Render");
-  pendingRerender = false;
-  useMemoHookIndex = 0;
-  divId = 0;
-  pendingEffects = [];
-
-  for (const stateUpdate of pendingStateUpdates) {
-    stateUpdate();
-  }
-
-  pendingStateUpdates = [];
-
-  rootRenderingParams.container.innerHTML = r(rootRenderingParams.generator, rootRenderingParams.props);
-
-  for (const effect of pendingEffects) {
-    effect.effect(document.getElementById("div" + effect.divId) ?? fail("Missing root"));
-  }
-}
-
-// Root render doesn't get any props.
-function render<Props>(generator: (props: Props) => string, props: Props, container: Element) {
-  rootRenderingParams = {
-    generator,
-    container,
-    props
-  };
-  rerenderRoot();
-}
-
 render(App, { title: "Title" }, document.querySelector('#app') ?? fail())

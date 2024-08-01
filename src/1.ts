@@ -1,3 +1,5 @@
+// Render a simple element with props once.
+
 import './style.css'
 
 function fail(msg?: string): never {
@@ -16,4 +18,4 @@ function App(props: { title: string }) {
   `
 }
 
-render(App, { title: "Title" }, document.querySelector('#app') ?? fail(),)
+render(App, { title: "Title" }, document.querySelector('#app') ?? fail())
