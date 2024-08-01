@@ -1,23 +1,5 @@
 import './style.css'
 
-class HookStates<T> {
-  index: number = 0;
-  states: T[] = [];
-
-  reset() {
-    this.index = 0;
-  }
-}
-
-function getHookState<T>(hookStates: HookStates<T>, factory: () => T): T {
-  let index = hookStates.index;
-  hookStates.index++;
-  if (hookStates.states.length <= index) {
-    hookStates.states.push(factory());
-  }
-  return hookStates.states[index] as T;
-}
-
 // Inspired by https://github.com/preactjs/preact/blob/f5738915a0d67c87f54f0ccd5b946e7a4ce0d5c1/hooks/src/index.js#L535
 function argsEqual(a: any[] | undefined, b: any[] | undefined): boolean {
   return !(!a || !b ||
@@ -27,20 +9,24 @@ function argsEqual(a: any[] | undefined, b: any[] | undefined): boolean {
 
 class UseMemoHookState<T> {
   value: T | null = null;
-  lastArgs: any[] | undefined = undefined;
+  lastArgs?: any[];
 }
 
-let useMemoHookStates = new HookStates<UseMemoHookState<any>>();
+let useMemoHookIndex = 0;
+let useMemoHookStates: UseMemoHookState<any>[] = [];
 
 function useMemo<T>(factory: () => T, args: any[]): T {
-  let state = getHookState<UseMemoHookState<T>>(useMemoHookStates, () => new UseMemoHookState());
-
+  let index = useMemoHookIndex++;
+  if (useMemoHookStates.length <= index) {
+    useMemoHookStates.push({ value: factory() });
+  }
+  const state = useMemoHookStates[index];
   if (!argsEqual(args, state.lastArgs)) {
     state.value = factory();
     state.lastArgs = args;
   }
 
-  return state.value ?? fail("Missing state value");
+  return state.value;
 }
 
 let pendingStateUpdates: (() => void)[] = [];
@@ -58,7 +44,7 @@ function useState<T>(initialValue: T): [T, ((f: (x: T) => T) => void)] {
     }
   }, [])
 
-  return [state.value, state.setter ?? fail("missing setter")];
+  return [state.value, state.setter];
 }
 
 class PendingEffect {
@@ -172,7 +158,7 @@ function rerenderRoot() {
   }
   console.log("Render");
   pendingRerender = false;
-  useMemoHookStates.reset();
+  useMemoHookIndex = 0;
   divId = 0;
   pendingEffects = [];
 
