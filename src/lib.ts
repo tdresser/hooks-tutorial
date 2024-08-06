@@ -1,14 +1,16 @@
 
 // Inspired by https://github.com/preactjs/preact/blob/f5738915a0d67c87f54f0ccd5b946e7a4ce0d5c1/hooks/src/index.js#L535
 function argsEqual(a: any[] | undefined, b: any[] | undefined): boolean {
-  return !(!a || !b ||
+  return !(
+    !a || !b ||
     (a.length !== b.length) ||
-    a.some((arg, index) => arg !== b[index]));
+    a.some((arg, index) => arg !== b[index])
+  );
 }
 
-class UseMemoHookState<T> {
-  value: T | null = null;
-  lastArgs?: any[];
+interface UseMemoHookState<T> {
+  value: T;
+  lastArgs: any[];
 }
 
 let useMemoHookIndex = 0;
@@ -17,7 +19,10 @@ let useMemoHookStates: UseMemoHookState<any>[] = [];
 export function useMemo<T>(factory: () => T, args: any[]): T {
   let index = useMemoHookIndex++;
   if (useMemoHookStates.length <= index) {
-    useMemoHookStates.push({ value: factory() });
+    useMemoHookStates.push({
+      value: factory(),
+      lastArgs: args,
+    });
   }
   const state = useMemoHookStates[index];
   if (!argsEqual(args, state.lastArgs)) {

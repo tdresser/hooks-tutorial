@@ -38,9 +38,9 @@ function argsEqual(a: any[] | undefined, b: any[] | undefined): boolean {
     a.some((arg, index) => arg !== b[index]));
 }
 
-class UseMemoHookState<T> {
-  value: T | null = null;
-  lastArgs?: any[];
+interface UseMemoHookState<T> {
+  value: T;
+  lastArgs: any[];
 }
 
 let useMemoHookStates: UseMemoHookState<any>[] = [];
@@ -48,7 +48,7 @@ let useMemoHookStates: UseMemoHookState<any>[] = [];
 function useMemo<T>(factory: () => T, args: any[]): T {
   let index = useMemoHookIndex++;
   if (useMemoHookStates.length <= index) {
-    useMemoHookStates.push({ value: factory() });
+    useMemoHookStates.push({ value: factory(), lastArgs: args });
   }
   const state = useMemoHookStates[index];
   if (!argsEqual(args, state.lastArgs)) {

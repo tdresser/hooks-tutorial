@@ -32,13 +32,13 @@ function render<Props>(generator: (props: Props) => string, props: Props, contai
 }
 
 
-class UseMemoHookState<T> {
-  value: T | null = null;
+interface UseMemoHookState<T> {
+  value: T;
 }
 
 let useMemoHookStates: UseMemoHookState<any>[] = [];
 
-export function useMemo<T>(factory: () => T): T {
+function useMemo<T>(factory: () => T): T {
   let index = useMemoHookIndex++;
   if (useMemoHookStates.length <= index) {
     useMemoHookStates.push({ value: factory() });

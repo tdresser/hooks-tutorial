@@ -32,8 +32,8 @@ function render<Props>(generator: (props: Props) => string, props: Props, contai
 }
 
 
-class UseMemoHookState<T> {
-  value: T | null = null;
+interface UseMemoHookState<T> {
+  value: T;
 }
 
 let useMemoHookStates: UseMemoHookState<any>[] = [];
