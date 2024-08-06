@@ -77,6 +77,7 @@ export function useRef(f: (root: HTMLElement) => HTMLElement | null) {
 let divId = 0;
 export function r<Props>(generator: (props: Props) => string, props: Props) {
   let div = document.createElement("div");
+  div.style.display = "contents";
   div.id = "div" + (++divId);
   div.innerHTML = generator(props);
   return div.outerHTML;
