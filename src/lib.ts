@@ -79,11 +79,21 @@ export function useRef(f: (root: HTMLElement) => HTMLElement | null) {
   return ref;
 }
 
+// TODO, try to replace the below with:
+function el(innerHTML: string): HTMLElement {
+  const el = document.createElement("div");
+  el.innerHTML = innerHTML;
+  if (el.children.length != 1) {
+    throw ("innerHTML passed to el must have a single element");
+  }
+  return el.children.item(0) as HTMLElement;
+}
+
 let divId = 0;
-export function r<Props>(generator: (props: Props) => string, props: Props) {
+export function r(generator: () => string) {
   return `
   <div id=div${++divId} style="display: contents">
-    ${generator(props)}
+    ${generator()}
   </div>
   `;
 }

@@ -34,18 +34,18 @@ function Counter() {
 
   return `
     <div class="increment">Increment</div>
-    ${r(Multiplier, { x: counter, y: 2 })}
-    ${r(Multiplier, { x: counter, y: 3 })}
-`;
+    ${r(() => Multiplier({ x: counter, y: 2 }))}
+    ${r(() => Multiplier({ x: counter, y: 3 }))}
+  `;
 }
 
 function App(props: { title: string }) {
   return `
-  <h1>${props.title}</h1>
-  <div>
-      ${r(Counter, {})}
-      ${r(Counter, {})}
+    <h1> ${props.title} </h1>
+      <div>
+      ${r(Counter)}
+      ${r(Counter)}
   </div>
-  `
+    `
 }
 render(App, { title: "Title" }, document.querySelector('#app') ?? fail())
